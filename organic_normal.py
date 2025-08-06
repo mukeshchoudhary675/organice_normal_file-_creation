@@ -111,18 +111,23 @@ if uploaded_file:
         for sheet in sheet_names:
             df = xls.parse(sheet)
             # ORGANIC
-            organic_off = process_data(df, sheet, "Organic", offlabel_start, offlabel_end, "Off-label Organic")
-            organic_off.to_excel(output_organic, sheet_name=f"Off-Label {sheet}", index=False)
-
             organic_ban = process_data(df, sheet, "Organic", banned_start, banned_end, "Banned Organic")
-            organic_ban.to_excel(output_organic, sheet_name=f"Banned {sheet}", index=False)
-
-            # NORMAL+LOOSE
+            organic_ban_sheet_name = f"Banned {sheet}"[:31]
+            organic_ban.to_excel(output_organic, sheet_name=organic_ban_sheet_name, index=False)
+            
+            organic_off = process_data(df, sheet, "Organic", offlabel_start, offlabel_end, "Off-label Organic")
+            organic_off_sheet_name = f"Off-Label {sheet}"[:31]
+            organic_off.to_excel(output_organic, sheet_name=organic_off_sheet_name, index=False)
+            
+            # NORMAL + LOOSE
             normal_off = process_data(df, sheet, ["Normal", "Loose"], offlabel_start, offlabel_end, "Off-label")
-            normal_off.to_excel(output_loose, sheet_name=f"Off-Label {sheet}", index=False)
-
+            normal_off_sheet_name = f"Off-Label {sheet}"[:31]
+            normal_off.to_excel(output_loose, sheet_name=normal_off_sheet_name, index=False)
+            
             normal_ban = process_data(df, sheet, ["Normal", "Loose"], banned_start, banned_end, "Banned")
-            normal_ban.to_excel(output_loose, sheet_name=f"Banned {sheet}", index=False)
+            normal_ban_sheet_name = f"Banned {sheet}"[:31]
+            normal_ban.to_excel(output_loose, sheet_name=normal_ban_sheet_name, index=False)
+
 
         output_organic.close()
         output_loose.close()
