@@ -36,13 +36,22 @@ if uploaded_file:
 
     def process_data(df, spice_name, variant_filter, start_col, end_col, type_name):
         result_rows = []
-        headers = df.columns.tolist()
+        headers = list(df.columns)
         pesticide_indexes = {}
+        
+        # Make sure the end_col doesn't go beyond the available columns
+        end_col = min(end_col, len(headers))
+        
         for i in range(start_col, end_col, 3):
-            pesticide_indexes[headers[i]] = {
+            pesticide_name = headers[i]
+            if i + 1 >= len(headers):
+                continue  # Skip if compliance column doesn't exist
+            pesticide_indexes[pesticide_name] = {
                 "valueIndex": i,
                 "complianceIndex": i + 1
             }
+        print("Headers:", headers)
+        print("Start column:", start_col, "End column:", end_col)
 
         pesticide_data = {}
         for idx, row in df.iterrows():
