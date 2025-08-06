@@ -4,29 +4,40 @@ import io
 
 st.set_page_config(layout="wide", page_title="Spice Pesticide Processor")
 
-st.title("Spice Pesticide Report Generator (Organic + Loose/Normal)")
+st.title("🌿 Spice Pesticide Report Generator")
 
 uploaded_file = st.file_uploader("Upload Excel file with 13 spice sheets", type=["xlsx"])
 
 if uploaded_file:
     xls = pd.ExcelFile(uploaded_file)
     sheet_names = xls.sheet_names
-    st.success(f"Found {len(sheet_names)} sheets: {', '.join(sheet_names)}")
+    st.success(f"✅ Found {len(sheet_names)} sheets: {', '.join(sheet_names)}")
 
-    with st.expander("Set Column Indices & Section Ranges"):
-        selected_sheet = st.selectbox("Choose a sample sheet for preview", sheet_names)
+    with st.expander("🔧 Column Settings"):
+        selected_sheet = st.selectbox("Preview a sample sheet", sheet_names)
         df_preview = xls.parse(selected_sheet, nrows=5)
         st.dataframe(df_preview)
 
         col_names = df_preview.columns.tolist()
         commodity_col = st.selectbox("Select 'Commodity' column", col_names)
         variant_col = st.selectbox("Select 'Variant' column", col_names)
-        separator_col = st.selectbox("Select column that indicates start of Banned Pesticides", col_names)
 
         col_indices = {col: df_preview.columns.get_loc(col) for col in df_preview.columns}
 
+        # Try to auto-detect separator column (case-insensitive match)
+        separator_col = None
+        for col in col_names:
+            if str(col).strip().lower() == "monitoring_banned_pesticide_starts":
+                separator_col = col
+                break
+
+        if separator_col is None:
+            separator_col = st.selectbox("Select column that marks 'Monitoring_banned_pesticide_Starts'", col_names)
+        else:
+            st.info(f"Auto-detected banned pesticide marker column: **{separator_col}**")
+
         separator_index = col_indices[separator_col]
-        offlabel_start = st.number_input("Off-label Start Column Index (0-based)", value=29)
+        offlabel_start = st.number_input("Start Column Index of Off-Label Pesticides", value=29)
         offlabel_end = separator_index - 1
         banned_start = separator_index + 1
         banned_end = len(col_names) - 1
@@ -38,20 +49,18 @@ if uploaded_file:
         result_rows = []
         headers = list(df.columns)
         pesticide_indexes = {}
-        
-        # Make sure the end_col doesn't go beyond the available columns
-        end_col = min(end_col, len(headers))
-        
-        for i in range(start_col, end_col, 3):
-            pesticide_name = headers[i]
+
+        # Safety: don’t go beyond headers
+        end_col = min(end_col, len(headers) - 1)
+
+        for i in range(start_col, end_col + 1, 3):
             if i + 1 >= len(headers):
-                continue  # Skip if compliance column doesn't exist
+                continue
+            pesticide_name = headers[i]
             pesticide_indexes[pesticide_name] = {
                 "valueIndex": i,
                 "complianceIndex": i + 1
             }
-        print("Headers:", headers)
-        print("Start column:", start_col, "End column:", end_col)
 
         pesticide_data = {}
         for idx, row in df.iterrows():
@@ -72,7 +81,7 @@ if uploaded_file:
                     try:
                         value = float(str(value).strip())
                     except (ValueError, TypeError):
-                        continue  # skip if value is not numeric
+                        continue
 
                     if pest not in pesticide_data:
                         pesticide_data[pest] = {}
@@ -91,7 +100,8 @@ if uploaded_file:
                             rec["max"] = value
 
         results = [["S. No", type_name + " Pesticide Residues", "Name of Spice",
-                    "Min Amount (mg/kg)", "Max Amount (mg/kg)", "No. of unsafe", "Total Samples", "% Unsafe"]]
+                    "Min Amount (mg/kg)", "Max Amount (mg/kg)",
+                    "No. of unsafe", "Total Samples", "% Unsafe"]]
 
         sn = 1
         for pest, commodities in pesticide_data.items():
@@ -106,33 +116,34 @@ if uploaded_file:
                 sn += 1
         return pd.DataFrame(results[1:], columns=results[0])
 
-    st.write("### Click below to process:")
+    st.write("### 📊 Click to process the files:")
+
     if st.button("Generate Reports"):
         for sheet in sheet_names:
             df = xls.parse(sheet)
+
             # ORGANIC
-            organic_ban = process_data(df, sheet, "Organic", banned_start, banned_end, "Banned Organic")
-            organic_ban_sheet_name = f"Banned {sheet}"[:31]
-            organic_ban.to_excel(output_organic, sheet_name=organic_ban_sheet_name, index=False)
-            
             organic_off = process_data(df, sheet, "Organic", offlabel_start, offlabel_end, "Off-label Organic")
-            organic_off_sheet_name = f"Off-Label {sheet}"[:31]
-            organic_off.to_excel(output_organic, sheet_name=organic_off_sheet_name, index=False)
-            
+            organic_off_sheet = f"Off-Label {sheet}"[:31]
+            organic_off.to_excel(output_organic, sheet_name=organic_off_sheet, index=False)
+
+            organic_ban = process_data(df, sheet, "Organic", banned_start, banned_end, "Banned Organic")
+            organic_ban_sheet = f"Banned {sheet}"[:31]
+            organic_ban.to_excel(output_organic, sheet_name=organic_ban_sheet, index=False)
+
             # NORMAL + LOOSE
             normal_off = process_data(df, sheet, ["Normal", "Loose"], offlabel_start, offlabel_end, "Off-label")
-            normal_off_sheet_name = f"Off-Label {sheet}"[:31]
-            normal_off.to_excel(output_loose, sheet_name=normal_off_sheet_name, index=False)
-            
-            normal_ban = process_data(df, sheet, ["Normal", "Loose"], banned_start, banned_end, "Banned")
-            normal_ban_sheet_name = f"Banned {sheet}"[:31]
-            normal_ban.to_excel(output_loose, sheet_name=normal_ban_sheet_name, index=False)
+            normal_off_sheet = f"Off-Label {sheet}"[:31]
+            normal_off.to_excel(output_loose, sheet_name=normal_off_sheet, index=False)
 
+            normal_ban = process_data(df, sheet, ["Normal", "Loose"], banned_start, banned_end, "Banned")
+            normal_ban_sheet = f"Banned {sheet}"[:31]
+            normal_ban.to_excel(output_loose, sheet_name=normal_ban_sheet, index=False)
 
         output_organic.close()
         output_loose.close()
 
         with open("organic_output.xlsx", "rb") as f1, open("loose_output.xlsx", "rb") as f2:
-            st.success("✅ Processing Completed!")
+            st.success("✅ Processing Completed Successfully!")
             st.download_button("📥 Download Organic Report", f1, "organic_output.xlsx")
             st.download_button("📥 Download Loose + Normal Report", f2, "loose_output.xlsx")
