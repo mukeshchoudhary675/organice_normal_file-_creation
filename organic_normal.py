@@ -60,7 +60,11 @@ if uploaded_file:
                 compliance = str(row[idxes["complianceIndex"]]).strip().lower()
 
                 if pd.notna(value) and value != "":
-                    value = float(value)
+                    try:
+                        value = float(str(value).strip())
+                    except (ValueError, TypeError):
+                        continue  # skip if value is not numeric
+
                     if pest not in pesticide_data:
                         pesticide_data[pest] = {}
                     if commodity not in pesticide_data[pest]:
